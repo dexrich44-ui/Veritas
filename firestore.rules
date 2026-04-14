@@ -1,0 +1,230 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId
+    // Fields:
+    //   - name: string (required)
+    //   - username: string (required, unique)
+    //   - photoUrl: string (optional)
+    //   - bio: string (optional)
+    //   - points: number (required)
+    //   - personality: map (optional)
+    //
+    // Collection: messages
+    // Document ID: auto-generated
+    // Fields:
+    //   - toUserId: string (required)
+    //   - fromUserId: string (optional)
+    //   - replyTo: string (optional)
+    //   - title: string (optional)
+    //   - content: string (required)
+    //   - type: string (required, enum)
+    //   - createdAt: timestamp (required)
+    //   - hints: list (optional)
+    //   - unlockedHints: number (optional)
+    //
+    // Collection: matches
+    // Document ID: auto-generated
+    // Fields:
+    //   - users: list (required, size 2)
+    //   - status: string (required, enum)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: questions
+    // Document ID: auto-generated
+    // Fields:
+    //   - text: string (required)
+    //   - type: string (required, enum)
+    //   - category: string (optional, enum)
+    //   - createdBy: string (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: answers
+    // Document ID: auto-generated
+    // Fields:
+    //   - questionId: string (required)
+    //   - userId: string (required)
+    //   - content: string (required)
+    //   - anonymous: bool (optional)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: votes
+    // Document ID: auto-generated
+    // Fields:
+    //   - questionId: string (required)
+    //   - votedUserId: string (required)
+    //   - voterId: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: interests
+    // Document ID: auto-generated
+    // Fields:
+    //   - fromUserId: string (required)
+    //   - toUserId: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // Collection: reports
+    // Document ID: auto-generated
+    // Fields:
+    //   - targetUserId: string (required)
+    //   - reporterId: string (optional)
+    //   - reason: string (required)
+    //   - createdAt: timestamp (required)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && request.auth.token.email == "wdex30807@gmail.com";
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'username', 'points']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.username is string && data.username.size() > 2 && data.username.size() < 30 &&
+             data.points is number && data.points >= 0 &&
+             (!('lastSeen' in data) || data.lastSeen is timestamp) &&
+             (!('isSuspended' in data) || data.isSuspended is bool) &&
+             (!('suspendedUntil' in data) || data.suspendedUntil is timestamp);
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['toUserId', 'content', 'type', 'createdAt']) &&
+             data.toUserId is string &&
+             (!('title' in data) || (data.title is string && data.title.size() < 100)) &&
+             (!('replyTo' in data) || (data.replyTo is string)) &&
+             (!('mediaUrl' in data) || (data.mediaUrl is string)) &&
+             (!('mediaType' in data) || (data.mediaType in ['image', 'video'])) &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 1000 &&
+             data.type in ['truth', 'dare', 'crush', 'friend'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidMatch(data) {
+      return data.keys().hasAll(['users', 'status', 'createdAt']) &&
+             data.users is list && data.users.size() == 2 &&
+             data.status in ['pending', 'matched'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['text', 'type', 'createdAt']) &&
+             data.text is string && data.text.size() > 0 &&
+             data.type in ['truth', 'dare', 'likely'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidAnswer(data) {
+      return data.keys().hasAll(['questionId', 'userId', 'content', 'createdAt']) &&
+             data.questionId is string &&
+             data.userId is string &&
+             data.content is string && data.content.size() > 0 &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidVote(data) {
+      return data.keys().hasAll(['questionId', 'votedUserId', 'voterId', 'createdAt']) &&
+             data.questionId is string &&
+             data.votedUserId is string &&
+             data.voterId is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidInterest(data) {
+      return data.keys().hasAll(['fromUserId', 'toUserId', 'createdAt']) &&
+             data.fromUserId is string &&
+             data.toUserId is string &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll(['targetUserId', 'reason', 'createdAt']) &&
+             data.targetUserId is string &&
+             data.reason is string && data.reason.size() > 0 &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Allow reading public profile info
+      allow read: if isAuthenticated();
+      
+      // Only owner can create/update their profile
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) && isValidUser(request.resource.data) &&
+                    request.resource.data.username == resource.data.username) || isAdmin();
+    }
+
+    match /messages/{messageId} {
+      // Recipient can read their messages
+      allow read: if (isAuthenticated() && request.auth.uid == resource.data.toUserId) || isAdmin();
+      
+      // Anyone authenticated can send an anonymous message
+      allow create: if isAuthenticated() && isValidMessage(request.resource.data);
+      
+      // Recipient can update (e.g., unlock hints)
+      allow update: if (isAuthenticated() && request.auth.uid == resource.data.toUserId &&
+                    isValidMessage(request.resource.data) &&
+                    request.resource.data.content == resource.data.content) || isAdmin();
+    }
+
+    match /matches/{matchId} {
+      // Users in the match can read it
+      allow read: if (isAuthenticated() && request.auth.uid in resource.data.users) || isAdmin();
+      
+      // Users can create a match
+      allow create: if isAuthenticated() && isValidMatch(request.resource.data) &&
+                    request.auth.uid in request.resource.data.users;
+                    
+      // Users in the match can update it
+      allow update: if (isAuthenticated() && request.auth.uid in resource.data.users &&
+                    isValidMatch(request.resource.data)) || isAdmin();
+    }
+
+    match /questions/{questionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidQuestion(request.resource.data) || isAdmin();
+    }
+
+    match /answers/{answerId} {
+      allow read: if isAuthenticated() || isAdmin();
+      allow create: if isAuthenticated() && isValidAnswer(request.resource.data) &&
+                    request.resource.data.userId == request.auth.uid;
+    }
+
+    match /votes/{voteId} {
+      allow read: if isAuthenticated() || isAdmin();
+      allow create: if isAuthenticated() && isValidVote(request.resource.data) &&
+                    request.resource.data.voterId == request.auth.uid;
+    }
+
+    match /interests/{interestId} {
+      allow read: if (isAuthenticated() && (resource.data.fromUserId == request.auth.uid || resource.data.toUserId == request.auth.uid)) || isAdmin();
+      allow create: if isAuthenticated() && isValidInterest(request.resource.data) &&
+                    request.resource.data.fromUserId == request.auth.uid;
+    }
+
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() && isValidReport(request.resource.data);
+      allow read: if isAdmin();
+    }
+  }
+}

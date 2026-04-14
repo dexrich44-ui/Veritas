@@ -1,0 +1,141 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "App user profile",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Display name" },
+        "username": { "type": "string", "description": "Unique username for the profile link" },
+        "photoUrl": { "type": "string", "description": "Profile picture URL" },
+        "bio": { "type": "string", "description": "User bio" },
+        "points": { "type": "number", "description": "Engagement points" },
+        "personality": { "type": "object", "description": "AI-generated personality insights" }
+      },
+      "required": ["name", "username"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Anonymous message sent to a user",
+      "type": "object",
+      "properties": {
+        "toUserId": { "type": "string", "description": "Recipient user ID" },
+        "fromUserId": { "type": "string", "description": "Sender user ID (optional, for matches)" },
+        "replyTo": { "type": "string", "description": "ID of the message being replied to" },
+        "title": { "type": "string", "description": "Optional title or theme for the message" },
+        "content": { "type": "string", "description": "Message content" },
+        "type": { "type": "string", "enum": ["truth", "dare", "crush", "friend"], "description": "Category of message" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "hints": { "type": "array", "items": { "type": "string" }, "description": "Progressive hints about the sender" },
+        "unlockedHints": { "type": "number", "description": "Number of hints unlocked" }
+      },
+      "required": ["toUserId", "content", "type", "createdAt"]
+    },
+    "Match": {
+      "title": "Match",
+      "description": "Mutual interest match",
+      "type": "object",
+      "properties": {
+        "users": { "type": "array", "items": { "type": "string" }, "description": "The two user IDs in the match" },
+        "status": { "type": "string", "enum": ["pending", "matched"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["users", "status", "createdAt"]
+    },
+    "Question": {
+      "title": "Question",
+      "description": "Game question",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "type": { "type": "string", "enum": ["truth", "dare", "likely"] },
+        "category": { "type": "string", "enum": ["spicy", "funny", "heavy", "normal"] },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["text", "type", "createdAt"]
+    },
+    "Answer": {
+      "title": "Answer",
+      "description": "Game answer",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "userId": { "type": "string" },
+        "content": { "type": "string" },
+        "anonymous": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["questionId", "userId", "content", "createdAt"]
+    },
+    "Vote": {
+      "title": "Vote",
+      "description": "Likely to vote",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "votedUserId": { "type": "string" },
+        "voterId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["questionId", "votedUserId", "voterId", "createdAt"]
+    },
+    "Interest": {
+      "title": "Interest",
+      "description": "Secret match interest",
+      "type": "object",
+      "properties": {
+        "fromUserId": { "type": "string" },
+        "toUserId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["fromUserId", "toUserId", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "Abuse report",
+      "type": "object",
+      "properties": {
+        "targetUserId": { "type": "string" },
+        "reporterId": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["targetUserId", "reason", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/messages/{messageId}": {
+      "schema": "Message",
+      "description": "Anonymous messages"
+    },
+    "/matches/{matchId}": {
+      "schema": "Match",
+      "description": "Mutual interest matches"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Game questions"
+    },
+    "/answers/{answerId}": {
+      "schema": "Answer",
+      "description": "Game answers"
+    },
+    "/votes/{voteId}": {
+      "schema": "Vote",
+      "description": "Game votes"
+    },
+    "/interests/{interestId}": {
+      "schema": "Interest",
+      "description": "Secret match interests"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Abuse reports"
+    }
+  }
+}
